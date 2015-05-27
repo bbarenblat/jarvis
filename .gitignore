@@ -1,0 +1,20 @@
+# Public domain                                                     -*- conf -*-
+
+# Editor backup files
+*~
+\#*
+.\#*
+
+# Sandboxes
+cabal-dev/
+.hsenv*/
+hsenv.log
+.cabal-sandbox/
+cabal.sandbox.config
+
+# GHC
+*.hi
+*.o
+
+# Cabal
+dist*/
