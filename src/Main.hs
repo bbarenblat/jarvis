@@ -15,7 +15,7 @@
 module Main (main) where
 
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Concurrent.SampleVar
+import Control.Concurrent.MSampleVar
 import Control.Monad (forever, void)
 import Data.Default.Class (def)
 import Graphics.Vty (Vty, (<->), (<|>))
@@ -33,36 +33,36 @@ initialize _ = return ()
 
 jarvis :: Vty -> IO ()
 jarvis terminal = do
-  log <- newSampleVar Vty.emptyImage
-  prompt <- newSampleVar Vty.emptyImage
-  ready <- newEmptySampleVar
+  log <- newSV Vty.emptyImage
+  prompt <- newSV Vty.emptyImage
+  ready <- newEmptySV
   void $ forkIO $ redrawer ready log prompt terminal
   void $ forkIO $ prompter prompt ready
   void $ forkIO $ logger log ready
   void $ Vty.nextEvent terminal
 
-prompter :: SampleVar Vty.Image -> SampleVar () -> IO ()
+prompter :: MSampleVar Vty.Image -> MSampleVar () -> IO ()
 prompter output redraw = prompt' 0
   where prompt' n = do
-          writeSampleVar output $ Vty.string def ("jarvis " ++ show n ++ " >")
-          writeSampleVar redraw ()
+          writeSV output $ Vty.string def ("jarvis " ++ show n ++ " >")
+          writeSV redraw ()
           threadDelay 1000000
           prompt' (n + 1)
 
-logger :: SampleVar Vty.Image -> SampleVar () -> IO ()
+logger :: MSampleVar Vty.Image -> MSampleVar () -> IO ()
 logger output redraw = log 0 []
   where log n lines = do
           let lines' = lines ++ ["<" ++ show n ++ ">"]
-          writeSampleVar output $ Vty.vertCat $ map (Vty.string def) lines'
-          writeSampleVar redraw ()
+          writeSV output $ Vty.vertCat $ map (Vty.string def) lines'
+          writeSV redraw ()
           threadDelay 200000
           log (n + 1) lines'
 
-redrawer :: SampleVar () -> SampleVar Vty.Image -> SampleVar Vty.Image -> Vty -> IO ()
+redrawer :: MSampleVar () -> MSampleVar Vty.Image -> MSampleVar Vty.Image -> Vty -> IO ()
 redrawer ready log prompt terminal = forever $ do
-  void $ readSampleVar ready
+  void $ readSV ready
   (_maxX, maxY) <- Vty.displayBounds $ Vty.outputIface terminal
-  images <- sequence $ map readSampleVar [log, prompt]
+  images <- sequence $ map readSV [log, prompt]
   let stack = resizeHeight' maxY $ Vty.vertCat images
   Vty.update terminal $ Vty.picForImage stack
   Vty.refresh terminal
