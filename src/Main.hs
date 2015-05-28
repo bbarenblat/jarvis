@@ -17,6 +17,7 @@ module Main (main) where
 import Prelude hiding (lines, log)
 
 import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.Chan
 import Control.Monad (forever, void)
 import Data.Default.Class (def)
 import Data.IORef
@@ -40,20 +41,37 @@ jarvis :: Vty -> IO ()
 jarvis terminal = do
   log <- newIORef Vty.emptyImage
   prompt <- newIORef Vty.emptyImage
+  promptInput <- newChan
   ready <- Flag.new
   void $ forkIO $ redrawer ready log prompt terminal
-  void $ forkIO $ prompter prompt ready
+  void $ forkIO $ prompter promptInput prompt ready
   void $ forkIO $ logger log ready
-  void $ Vty.nextEvent terminal
+  processEvents terminal promptInput
 
-prompter :: IORef Vty.Image -> Flag -> IO ()
-prompter output redraw = prompt' 0
-  where prompt' :: Integer -> IO ()
-        prompt' n = do
-          writeIORef output $ Vty.string def ("jarvis " ++ show n ++ " >")
-          Flag.wave redraw
-          threadDelay 1000000
-          prompt' (n + 1)
+processEvents :: Vty -> Chan Vty.Event -> IO ()
+processEvents terminal promptInput = do
+  event <- Vty.nextEvent terminal
+  case event of
+    Vty.EvKey (Vty.KChar 'd') [Vty.MCtrl] -> return ()
+    Vty.EvKey (Vty.KChar _) _ -> writeChan promptInput event >> continue
+    _ -> continue
+  where continue = processEvents terminal promptInput
+
+prompter :: Chan Vty.Event -> IORef Vty.Image -> Flag -> IO ()
+prompter input output redraw = do
+  let promptString = "> "
+  writeIORef output $ Vty.string def promptString
+  Flag.wave redraw
+  readCommand ""
+  where readCommand command = do
+          event <- readChan input
+          case event of
+            Vty.EvKey (Vty.KChar c) _ -> do
+              let command' = command ++ [c]
+              writeIORef output $ Vty.string def $ "> " ++ command'
+              Flag.wave redraw
+              readCommand command'
+            _ -> readCommand command
 
 logger :: IORef Vty.Image -> Flag -> IO ()
 logger output redraw = log 0 []
