@@ -28,7 +28,7 @@ tested-with:         GHC==7.6.3
 
 executable jarvis
   main-is:             Main.hs
-  -- other-modules:       
+  other-modules:       Flag
   build-depends:       base >=4.6 && <4.7
                      , data-default-class >=0.0.1 && <0.1
                      , vty >=5.2.3 && <5.3

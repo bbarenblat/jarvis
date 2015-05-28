@@ -17,12 +17,14 @@ module Main (main) where
 import Prelude hiding (lines, log)
 
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Concurrent.MSampleVar
 import Control.Monad (forever, void)
 import Data.Default.Class (def)
 import Data.IORef
 import Graphics.Vty (Vty)
 import qualified Graphics.Vty as Vty
+
+import Flag (Flag)
+import qualified Flag
 
 main :: IO ()
 main = do
@@ -38,34 +40,34 @@ jarvis :: Vty -> IO ()
 jarvis terminal = do
   log <- newIORef Vty.emptyImage
   prompt <- newIORef Vty.emptyImage
-  ready <- newEmptySV
+  ready <- Flag.new
   void $ forkIO $ redrawer ready log prompt terminal
   void $ forkIO $ prompter prompt ready
   void $ forkIO $ logger log ready
   void $ Vty.nextEvent terminal
 
-prompter :: IORef Vty.Image -> MSampleVar () -> IO ()
+prompter :: IORef Vty.Image -> Flag -> IO ()
 prompter output redraw = prompt' 0
   where prompt' :: Integer -> IO ()
         prompt' n = do
           writeIORef output $ Vty.string def ("jarvis " ++ show n ++ " >")
-          writeSV redraw ()
+          Flag.wave redraw
           threadDelay 1000000
           prompt' (n + 1)
 
-logger :: IORef Vty.Image -> MSampleVar () -> IO ()
+logger :: IORef Vty.Image -> Flag -> IO ()
 logger output redraw = log 0 []
   where log :: Integer -> [String] -> IO ()
         log n lines = do
           let lines' = lines ++ ["<" ++ show n ++ ">"]
           writeIORef output $ Vty.vertCat $ map (Vty.string def) lines'
-          writeSV redraw ()
+          Flag.wave redraw
           threadDelay 200000
           log (n + 1) lines'
 
-redrawer :: MSampleVar () -> IORef Vty.Image -> IORef Vty.Image -> Vty -> IO ()
+redrawer :: Flag -> IORef Vty.Image -> IORef Vty.Image -> Vty -> IO ()
 redrawer ready log prompt terminal = forever $ do
-  void $ readSV ready
+  Flag.wait ready
   (_maxX, maxY) <- Vty.displayBounds $ Vty.outputIface terminal
   images <- sequence $ map readIORef [log, prompt]
   let stack = resizeHeight' maxY $ Vty.vertCat images
