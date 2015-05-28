@@ -20,6 +20,7 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MSampleVar
 import Control.Monad (forever, void)
 import Data.Default.Class (def)
+import Data.IORef
 import Graphics.Vty (Vty)
 import qualified Graphics.Vty as Vty
 
@@ -35,38 +36,38 @@ initialize _ = return ()
 
 jarvis :: Vty -> IO ()
 jarvis terminal = do
-  log <- newSV Vty.emptyImage
-  prompt <- newSV Vty.emptyImage
+  log <- newIORef Vty.emptyImage
+  prompt <- newIORef Vty.emptyImage
   ready <- newEmptySV
   void $ forkIO $ redrawer ready log prompt terminal
   void $ forkIO $ prompter prompt ready
   void $ forkIO $ logger log ready
   void $ Vty.nextEvent terminal
 
-prompter :: MSampleVar Vty.Image -> MSampleVar () -> IO ()
+prompter :: IORef Vty.Image -> MSampleVar () -> IO ()
 prompter output redraw = prompt' 0
   where prompt' :: Integer -> IO ()
         prompt' n = do
-          writeSV output $ Vty.string def ("jarvis " ++ show n ++ " >")
+          writeIORef output $ Vty.string def ("jarvis " ++ show n ++ " >")
           writeSV redraw ()
           threadDelay 1000000
           prompt' (n + 1)
 
-logger :: MSampleVar Vty.Image -> MSampleVar () -> IO ()
+logger :: IORef Vty.Image -> MSampleVar () -> IO ()
 logger output redraw = log 0 []
   where log :: Integer -> [String] -> IO ()
         log n lines = do
           let lines' = lines ++ ["<" ++ show n ++ ">"]
-          writeSV output $ Vty.vertCat $ map (Vty.string def) lines'
+          writeIORef output $ Vty.vertCat $ map (Vty.string def) lines'
           writeSV redraw ()
           threadDelay 200000
           log (n + 1) lines'
 
-redrawer :: MSampleVar () -> MSampleVar Vty.Image -> MSampleVar Vty.Image -> Vty -> IO ()
+redrawer :: MSampleVar () -> IORef Vty.Image -> IORef Vty.Image -> Vty -> IO ()
 redrawer ready log prompt terminal = forever $ do
   void $ readSV ready
   (_maxX, maxY) <- Vty.displayBounds $ Vty.outputIface terminal
-  images <- sequence $ map readSV [log, prompt]
+  images <- sequence $ map readIORef [log, prompt]
   let stack = resizeHeight' maxY $ Vty.vertCat images
   Vty.update terminal $ Vty.picForImage stack
   Vty.refresh terminal
