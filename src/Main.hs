@@ -14,11 +14,13 @@
 
 module Main (main) where
 
+import Prelude hiding (lines, log)
+
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MSampleVar
 import Control.Monad (forever, void)
 import Data.Default.Class (def)
-import Graphics.Vty (Vty, (<->), (<|>))
+import Graphics.Vty (Vty)
 import qualified Graphics.Vty as Vty
 
 main :: IO ()
@@ -43,7 +45,8 @@ jarvis terminal = do
 
 prompter :: MSampleVar Vty.Image -> MSampleVar () -> IO ()
 prompter output redraw = prompt' 0
-  where prompt' n = do
+  where prompt' :: Integer -> IO ()
+        prompt' n = do
           writeSV output $ Vty.string def ("jarvis " ++ show n ++ " >")
           writeSV redraw ()
           threadDelay 1000000
@@ -51,7 +54,8 @@ prompter output redraw = prompt' 0
 
 logger :: MSampleVar Vty.Image -> MSampleVar () -> IO ()
 logger output redraw = log 0 []
-  where log n lines = do
+  where log :: Integer -> [String] -> IO ()
+        log n lines = do
           let lines' = lines ++ ["<" ++ show n ++ ">"]
           writeSV output $ Vty.vertCat $ map (Vty.string def) lines'
           writeSV redraw ()
